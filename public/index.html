@@ -40,64 +40,8 @@
     --card-hover: rgba(0,0,0,0.02);
   }
 
-  [data-theme="dark"] {
-    --bg: #0a0a0a;
-    --surface: #111;
-    --border: rgba(255,255,255,0.08);
-    --border-hover: rgba(255,255,255,0.16);
-    --text: #ededed;
-    --muted: #888;
-    --dim: #444;
-    --cyan: #00BFFF;
-    --cyan-dim: rgba(0,191,255,0.1);
-    --nav-bg: rgba(10,10,10,0.88);
-    --form-bg: #161616;
-    --card-hover: rgba(255,255,255,0.02);
-    --btn-bg: #ededed;
-    --btn-text: #0a0a0a;
-  }
-
   /* auto dark if no preference set */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0a0a0a;
-      --surface: #111;
-      --border: rgba(255,255,255,0.08);
-      --border-hover: rgba(255,255,255,0.16);
-      --text: #ededed;
-      --muted: #888;
-      --dim: #444;
-      --cyan: #00BFFF;
-      --cyan-dim: rgba(0,191,255,0.1);
-      --nav-bg: rgba(10,10,10,0.88);
-      --form-bg: #161616;
-      --card-hover: rgba(255,255,255,0.02);
-      --btn-bg: #ededed;
-      --btn-text: #0a0a0a;
-    }
   }
-
-  /* ── THEME TOGGLE ── */
-  .theme-toggle {
-    width: 36px; height: 36px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: transparent;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
-    transition: border-color .2s, background .2s;
-    flex-shrink: 0;
-  }
-  .theme-toggle:hover { border-color: var(--border-hover); background: var(--surface); }
-  .theme-toggle svg { color: var(--text); display: block; }
-  .theme-toggle .icon-sun { display: none; }
-  .theme-toggle .icon-moon { display: block; }
-  [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
-  [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .theme-toggle .icon-sun { display: block; }
-    :root:not([data-theme="light"]) .theme-toggle .icon-moon { display: none; }
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -575,7 +519,7 @@
   /* ── SMOOTH THEME TRANSITION ── */
   body, nav, footer, section, .pain-card, .step, .sit-card, .not-row,
   .who-item, .faq-item, .faq-a, .mobile-menu, .sticky-cta,
-  .btn-primary, .btn-outline, .btn-nav, .btn-submit, .theme-toggle,
+  .btn-primary, .btn-outline, .btn-nav, .btn-submit,
   .hamburger, input, textarea, h1, h2, p, a, span, div {
     transition: background-color .2s ease, border-color .2s ease, color .2s ease;
   }
@@ -700,10 +644,6 @@
     <a href="#how" class="nav-link">Как работает</a>
     <a href="#products" class="nav-link">Продукты</a>
     <a href="#who" class="nav-link">Для кого</a>
-    <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
-      <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="1" x2="8" y2="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="8" y1="13" x2="8" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="8" x2="3" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="13" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="2.93" y1="2.93" x2="4.34" y2="4.34" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="11.66" y1="11.66" x2="13.07" y2="13.07" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="2.93" y1="13.07" x2="4.34" y2="11.66" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="11.66" y1="4.34" x2="13.07" y2="2.93" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.5 10A6 6 0 0 1 6 2.5a.5.5 0 0 0-.6-.6A6.5 6.5 0 1 0 14.1 10.6a.5.5 0 0 0-.6-.6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
     <button class="hamburger" id="hamburger" aria-label="Меню">
       <span></span><span></span><span></span>
     </button>
@@ -1068,7 +1008,7 @@
       </svg>
       <span class="f-name">Новые интеллектуальные инструменты</span>
     </div>
-    <div class="f-right">© 2026 НИИ · <span style="color:var(--dim);font-size:11px;">v1.3.0</span></div>
+    <div class="f-right">© 2026 НИИ · <span style="color:var(--dim);font-size:11px;">v1.4.0</span></div>
   </div>
 
 </footer>
@@ -1108,25 +1048,6 @@
     });
   };
   window.addEventListener('scroll', highlightNav, { passive: true });
-
-  // Theme toggle
-  const root = document.documentElement;
-  const toggleBtn = document.getElementById('themeToggle');
-  const saved = localStorage.getItem('theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-  if (saved) {
-    root.setAttribute('data-theme', saved);
-  } else if (prefersDark) {
-    root.setAttribute('data-theme', 'dark');
-  }
-
-  toggleBtn.addEventListener('click', () => {
-    const current = root.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-    root.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-  });
 
   // Scroll progress
   const bar = document.getElementById('scrollBar');
