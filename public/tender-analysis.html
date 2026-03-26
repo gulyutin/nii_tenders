@@ -462,24 +462,56 @@
 <main>
   <div class="input-section">
     <h1 class="page-title">Анализ тендера</h1>
-    <p class="page-sub">Загрузите документы закупки — получите анализ заказчика, оценку рисков и рекомендацию.</p>
+    <p class="page-sub">Загрузите документы или введите номер закупки из ЕИС.</p>
 
     <div id="error-box" class="error-box"></div>
 
-    <!-- DROPZONE -->
-    <div class="card">
-      <div class="card-label">Документы тендера</div>
-      <div class="dropzone" id="dropzone"
-        ondragover="handleDragOver(event)"
-        ondragleave="handleDragLeave(event)"
-        ondrop="handleDrop(event)">
-        <input type="file" multiple accept=".pdf,.docx,.doc,.txt,.xlsx,.xls"
-          onchange="handleFiles(this.files)">
-        <div class="drop-icon">📎</div>
-        <div class="drop-title">Перетащите файлы или нажмите для выбора</div>
-        <div class="drop-sub">PDF, DOCX, XLSX, TXT — техническое задание, извещение, проект контракта</div>
+    <!-- TABS -->
+    <div style="display:flex; gap:0; margin-bottom:16px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
+      <button id="tab-files" onclick="switchTab('files')"
+        style="flex:1; padding:10px; font-family:var(--font); font-size:13px; font-weight:600; border:none; cursor:pointer; background:var(--btn-bg); color:var(--btn-text); transition:all .15s;">
+        📎 Загрузить файлы
+      </button>
+      <button id="tab-eis" onclick="switchTab('eis')"
+        style="flex:1; padding:10px; font-family:var(--font); font-size:13px; font-weight:600; border:none; cursor:pointer; background:var(--surface); color:var(--muted); transition:all .15s;">
+        🔍 Номер из ЕИС
+      </button>
+    </div>
+
+    <!-- FILES TAB -->
+    <div id="pane-files">
+      <div class="card">
+        <div class="card-label">Документы тендера</div>
+        <div class="dropzone" id="dropzone"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event)">
+          <input type="file" multiple accept=".pdf,.docx,.doc,.txt,.xlsx,.xls"
+            onchange="handleFiles(this.files)">
+          <div class="drop-icon">📎</div>
+          <div class="drop-title">Перетащите файлы или нажмите для выбора</div>
+          <div class="drop-sub">PDF, DOCX, XLSX, TXT — техническое задание, извещение, проект контракта</div>
+        </div>
+        <div class="files-list" id="files-list"></div>
       </div>
-      <div class="files-list" id="files-list"></div>
+    </div>
+
+    <!-- EIS TAB -->
+    <div id="pane-eis" style="display:none;">
+      <div class="card">
+        <div class="card-label">Регистрационный номер закупки</div>
+        <input type="text" id="eis-number" placeholder="Например: 0123456789 или 00002673-ЭА"
+          style="margin-bottom:8px;"
+          onkeydown="if(event.key==='Enter') fetchFromEIS()">
+        <button onclick="fetchFromEIS()"
+          style="margin-bottom:8px; padding:9px 18px; font-family:var(--font); font-size:13px; font-weight:600; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer;">
+          🔍 Найти в ЕИС
+        </button>
+        <p style="font-size:12px; color:var(--muted); margin:0;">
+          Номер из системы ЕИС (zakupki.gov.ru). Нажмите «Найти» — мы загрузим данные автоматически.
+        </p>
+        <div id="eis-status" style="margin-top:10px; font-size:13px; color:var(--muted); display:none;"></div>
+      </div>
     </div>
 
     <!-- CONTEXT -->
@@ -574,7 +606,7 @@
     </svg>
     <span class="f-name">НИИ.Тендеры · <a href="/">nii.agency</a></span>
   </div>
-  <div class="f-right">© 2026 НИИ · <span style="color:var(--dim);font-size:11px;">v1.6.0</span></div>
+  <div class="f-right">© 2026 НИИ · <span style="color:var(--dim);font-size:11px;">v1.7.0</span></div>
 </footer>
 
 <script>
@@ -582,6 +614,56 @@
 const API_URL = '/api/analyze';
 
 let uploadedFiles = [];
+
+// EIS integration
+let activeTab = 'files';
+let eisTextContent = null;
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('pane-files').style.display = tab === 'files' ? 'block' : 'none';
+  document.getElementById('pane-eis').style.display  = tab === 'eis'   ? 'block' : 'none';
+  document.getElementById('tab-files').style.background = tab === 'files' ? 'var(--btn-bg)' : 'var(--surface)';
+  document.getElementById('tab-files').style.color    = tab === 'files' ? 'var(--btn-text)' : 'var(--muted)';
+  document.getElementById('tab-eis').style.background = tab === 'eis'   ? 'var(--btn-bg)' : 'var(--surface)';
+  document.getElementById('tab-eis').style.color      = tab === 'eis'   ? 'var(--btn-text)' : 'var(--muted)';
+}
+
+async function fetchFromEIS() {
+  const num = document.getElementById('eis-number').value.trim();
+  if (!num) { showError('Введите номер закупки'); return; }
+
+  const status = document.getElementById('eis-status');
+  status.style.display = 'block';
+  status.style.color = 'var(--muted)';
+  status.textContent = '⏳ Загружаем данные из ЕИС...';
+  eisTextContent = null;
+  hideError();
+
+  try {
+    const resp = await fetch('/api/fetch-tender', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ regNumber: num })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      status.style.color = 'var(--red)';
+      status.textContent = '✗ ' + (data.error || 'Ошибка загрузки');
+      return;
+    }
+
+    eisTextContent = data.text;
+    const docsCount = data.docLinks?.length || 0;
+    status.style.color = 'var(--green)';
+    status.textContent = `✓ Данные загружены. Документов найдено: ${docsCount}. Нажмите «Проанализировать».`;
+
+  } catch(e) {
+    status.style.color = 'var(--red)';
+    status.textContent = '✗ Ошибка соединения: ' + e.message;
+  }
+}
 
 function showError(msg) {
   const el = document.getElementById('error-box');
@@ -736,7 +818,18 @@ function setProgress(step) {
 
 async function analyze() {
   hideError();
-  if (uploadedFiles.length === 0) { showError('Загрузите хотя бы один файл тендера'); return; }
+  // EIS mode
+  if (activeTab === 'eis') {
+    if (!eisTextContent) {
+      const num = document.getElementById('eis-number').value.trim();
+      if (!num) { showError('Введите номер закупки'); return; }
+      // Auto-fetch if not done yet
+      await fetchFromEIS();
+      if (!eisTextContent) return; // fetch failed
+    }
+  } else {
+    if (uploadedFiles.length === 0) { showError('Загрузите хотя бы один файл тендера'); return; }
+  }
 
   document.querySelector('.input-section').style.display = 'none';
   document.getElementById('loading').style.display = 'block';
@@ -764,7 +857,19 @@ async function analyze() {
       }
     }
 
+    // Add EIS text if in EIS mode
+    if (activeTab === 'eis' && eisTextContent) {
+      const eisNum = document.getElementById('eis-number').value.trim();
+      messageContent.push({ type: 'text', text: `=== Данные закупки из ЕИС (номер ${eisNum}) ===
+${eisTextContent}` });
+      if (!uploadedFiles.length) {
+        // No files - set a fake filename for the report title
+        uploadedFiles = [{ name: `Закупка_${eisNum}` }];
+      }
+    }
+
     if (textParts.length > 0) messageContent.push({ type: 'text', text: textParts.join('\n\n') });
+
     setProgress(3);
 
     lastMessageContent = [...messageContent];
