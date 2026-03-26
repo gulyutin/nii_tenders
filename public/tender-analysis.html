@@ -581,7 +581,7 @@
     </svg>
     <span class="f-name">НИИ.Тендеры · <a href="/">nii.agency</a></span>
   </div>
-  <div class="f-right">© 2026 НИИ · <span style="color:var(--dim);font-size:11px;">v1.3.0</span></div>
+  <div class="f-right">© 2026 НИИ · <span style="color:var(--dim);font-size:11px;">v1.4.0</span></div>
 </footer>
 
 <script>
@@ -1008,7 +1008,10 @@ async function askDeep(idx) {
 }
 
 function detectVerdict(text) {
-  const u = text.toUpperCase();
+  // Ищем только в секции ВЕРДИКТ, первые 800 символов после ## ВЕРДИКТ
+  const verdictMatch = text.match(/## ВЕРДИКТ\s*([\s\S]{0,800}?)(?=##|$)/i);
+  const searchIn = verdictMatch ? verdictMatch[1] : text.slice(0, 800);
+  const u = searchIn.toUpperCase();
   if (u.includes('НЕ УЧАСТВОВАТЬ')) return 'nogo';
   if (u.includes('С ОГОВОРКАМИ') || u.includes('ОГОВОРКАМИ')) return 'maybe';
   if (u.includes('УЧАСТВОВАТЬ')) return 'go';
