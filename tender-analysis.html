@@ -301,6 +301,7 @@
   .md-table {
     width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0;
   }
+  .table-wrap { overflow-x: auto; margin: 8px 0; }
   .md-table th {
     background: var(--surface); font-weight: 600; text-align: left;
     padding: 8px 12px; border: 1px solid var(--border); font-size: 12px;
@@ -311,6 +312,40 @@
   }
   .md-table tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
   [data-theme="dark"] .md-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+  /* Risk blocks */
+  .risk-block {
+    border-radius: var(--radius); border: 1px solid var(--border);
+    margin-bottom: 8px; overflow: hidden;
+  }
+  .risk-block-header {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+    background: var(--surface);
+  }
+  .risk-block-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
+  .risk-block-body {
+    font-size: 13px; line-height: 1.65; color: var(--muted);
+    padding: 10px 14px; border-top: 1px solid var(--border);
+  }
+  .rb-block-high { border-color: rgba(220,38,38,0.2); }
+  .rb-block-high .risk-block-header { background: var(--red-bg); }
+  .rb-block-mid { border-color: rgba(217,119,6,0.2); }
+  .rb-block-mid .risk-block-header { background: var(--yellow-bg); }
+  .rb-block-low { border-color: rgba(22,163,74,0.15); }
+  .rb-block-low .risk-block-header { background: var(--green-bg); }
+
+  /* Checklist */
+  .checklist-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    cursor: pointer; font-size: 14px; line-height: 1.5;
+  }
+  .checklist-item:first-of-type { border-top: 1px solid var(--border); }
+  .checklist-item input[type=checkbox] { margin-top: 3px; flex-shrink: 0; cursor: pointer; accent-color: var(--cyan); width: 15px; height: 15px; }
+  .checklist-item span { flex: 1; }
+  .checklist-item input:checked + span { color: var(--dim); text-decoration: line-through; }
+  .checklist-group { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+  .rsc-body h4 { font-size: 13px; font-weight: 700; color: var(--muted); margin: 14px 0 8px; }
 
   /* Risk badges */
   .risk-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -1011,21 +1046,16 @@ function renderReport(text) {
   const container = document.getElementById('report-content');
   container.innerHTML = sections.map(sec => {
     const icon = getSectionIcon(sec.title);
-    const isRisks = sec.title.toUpperCase().includes('ГЛАВНЫЕ РИСКИ') || sec.title.toUpperCase().includes('MAIN RISK');
+    const titleU = sec.title.toUpperCase();
+    const isRisks = titleU.includes('РИСК');
+    const isChecklist = titleU.includes('ЧТО') || titleU.includes('ПОДАЧ') || titleU.includes('РЕКОМЕНД');
     const bodyLines = sec.lines.join('\n').trim();
 
     let bodyHtml;
     if (isRisks) {
-      // Parse as risk items
-      const items = bodyLines.split('\n').filter(l => l.trim());
-      const riskHtml = items.map(line => {
-        const level = parseRiskLevel(line);
-        if (!level && !line.startsWith('-') && !line.match(/^\|/)) return `<p>${escapeHtml(line)}</p>`;
-        const clean = line.replace(/^[-|]\s*/, '').replace(/🔴|🟠|🟡|🟢/g, '').trim();
-        const pill = level ? `<span class="risk-badge-pill rb-${level}">${level === 'high' ? 'Высокий' : level === 'mid' ? 'Средний' : 'Низкий'}</span>` : '';
-        return `<div class="risk-item">${pill}<span class="risk-text">${markdownInline(clean)}</span></div>`;
-      }).join('');
-      bodyHtml = riskHtml;
+      bodyHtml = renderRisksSection(bodyLines);
+    } else if (isChecklist) {
+      bodyHtml = renderChecklist(bodyLines);
     } else {
       bodyHtml = convertMarkdown(bodyLines);
     }
@@ -1044,36 +1074,107 @@ function renderReport(text) {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function markdownInline(s) {
-  return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/НЕ УЧАСТВОВАТЬ/g, '<span class="verdict-nogo">НЕ УЧАСТВОВАТЬ</span>')
+    .replace(/УЧАСТВОВАТЬ С ОГОВОРКАМИ/g, '<span class="verdict-maybe">УЧАСТВОВАТЬ С ОГОВОРКАМИ</span>')
+    .replace(/\bУЧАСТВОВАТЬ\b/g, '<span class="verdict-go">УЧАСТВОВАТЬ</span>');
+}
+
+function renderRisksSection(text) {
+  // Parse risk blocks: each starts with 🔴/🟠/🟡 or high/medium/low keyword
+  const lines = text.split('\n');
+  let html = '';
+  let currentLevel = null;
+  let currentTitle = '';
+  let currentBody = [];
+
+  const flushRisk = () => {
+    if (!currentTitle) return;
+    const levelClass = currentLevel === 'high' ? 'rb-high' : currentLevel === 'mid' ? 'rb-mid' : 'rb-low';
+    const levelLabel = currentLevel === 'high' ? 'Высокий' : currentLevel === 'mid' ? 'Средний' : 'Низкий';
+    html += `<div class="risk-block rb-block-${currentLevel || 'mid'}">
+      <div class="risk-block-header">
+        <span class="risk-badge-pill ${levelClass}">${levelLabel}</span>
+        <span class="risk-block-title">${markdownInline(currentTitle)}</span>
+      </div>
+      ${currentBody.length ? `<div class="risk-block-body">${markdownInline(currentBody.join(' '))}</div>` : ''}
+    </div>`;
+    currentBody = [];
+  };
+
+  for (const line of lines) {
+    const l = line.trim();
+    if (!l || l.match(/^---+$/)) { flushRisk(); currentTitle = ''; currentLevel = null; continue; }
+
+    // Detect level headers like "🔴 ВЫСОКИЕ РИСКИ"
+    if (l.match(/^(🔴|ВЫСОК)/i)) { flushRisk(); currentTitle = ''; currentLevel = 'high'; continue; }
+    if (l.match(/^(🟠|СРЕДН)/i)) { flushRisk(); currentTitle = ''; currentLevel = 'mid'; continue; }
+    if (l.match(/^(🟡|НИЗК)/i)) { flushRisk(); currentTitle = ''; currentLevel = 'low'; continue; }
+
+    // Detect risk items starting with emoji or "Риск N:"
+    const riskMatch = l.match(/^(🔴|🟠|🟡)\s*(.+)/);
+    const riskNumMatch = l.match(/^(Риск\s*\d+[:.]?)\s*(.+)/i);
+    if (riskMatch) {
+      flushRisk();
+      const lvl = riskMatch[1] === '🔴' ? 'high' : riskMatch[1] === '🟠' ? 'mid' : 'low';
+      currentLevel = currentLevel || lvl;
+      currentTitle = riskMatch[2].replace(/🔴|🟠|🟡/g, '').trim();
+    } else if (riskNumMatch) {
+      flushRisk();
+      currentTitle = riskNumMatch[1] + ' ' + riskNumMatch[2];
+    } else if (currentTitle) {
+      currentBody.push(l.replace(/^[-•]\s*/, ''));
+    }
+  }
+  flushRisk();
+  return html || convertMarkdown(text);
+}
+
+function renderChecklist(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  return lines.map(line => {
+    const l = line.trim();
+    if (!l || l.match(/^---+$/)) return '';
+    if (l.match(/^###\s/)) return `<div class="checklist-group">${markdownInline(l.replace(/^###\s*/, ''))}</div>`;
+    if (l.match(/^\[ \]|^-\s/)) {
+      const text = l.replace(/^\[ \]\s*/, '').replace(/^-\s*/, '');
+      return `<label class="checklist-item"><input type="checkbox"><span>${markdownInline(text)}</span></label>`;
+    }
+    return `<p>${markdownInline(l)}</p>`;
+  }).join('');
 }
 
 function convertMarkdown(text) {
-  // Parse markdown tables first
-  text = text.replace(/(\|.+\|\n)+/g, match => {
-    const rows = match.trim().split('\n');
-    if (rows.length < 2) return match;
-    let html = '<table class="md-table">';
-    rows.forEach((row, i) => {
-      if (row.match(/^\|[-| ]+\|$/)) return; // skip separator row
-      const cells = row.split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-      const tag = i === 0 ? 'th' : 'td';
-      html += '<tr>' + cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
-    });
-    html += '</table>';
+  // Parse markdown tables
+  text = text.replace(/((?:\|.+\|\n?)+)/g, match => {
+    const rows = match.trim().split('\n').filter(r => r.trim());
+    if (rows.length < 1) return match;
+    let html = '<div class="table-wrap"><table class="md-table">';
+    let isFirst = true;
+    for (const row of rows) {
+      if (row.match(/^\|[-| :]+\|$/)) continue; // separator
+      const cells = row.split('|').filter((_, i, a) => i > 0 && i < a.length - 1);
+      const tag = isFirst ? 'th' : 'td';
+      html += '<tr>' + cells.map(c => `<${tag}>${markdownInline(c.trim())}</${tag}>`).join('') + '</tr>';
+      isFirst = false;
+    }
+    html += '</table></div>';
     return html;
   });
 
   return text
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>' + m + '</ul>')
-    .replace(/^(?!<[hult])(.*\S.*)$/gm, '<p>$1</p>')
+    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => '<ul>' + m + '</ul>')
+    .replace(/^(?!<[hult\/])(.*\S.*)$/gm, '<p>$1</p>')
     .replace(/<p><\/p>/g, '')
+    .replace(/<p>---<\/p>/g, '')
     .replace(/НЕ УЧАСТВОВАТЬ/g, '<span class="verdict-nogo">НЕ УЧАСТВОВАТЬ</span>')
     .replace(/УЧАСТВОВАТЬ С ОГОВОРКАМИ/g, '<span class="verdict-maybe">УЧАСТВОВАТЬ С ОГОВОРКАМИ</span>')
     .replace(/\bУЧАСТВОВАТЬ\b/g, '<span class="verdict-go">УЧАСТВОВАТЬ</span>');
