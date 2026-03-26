@@ -1068,17 +1068,10 @@ function renderReport(text) {
   const paramsMatch = text.match(/## Ключевые параметры[\s\S]+?(?=##)/i);
   const keyFacts = [];
   if (paramsMatch) {
-    const nmck = paramsMatch[0].match(/НМЦК[^
-]*?(\d[\d\s]+(?:руб|млн)[^
-]*)/i);
-    const deadline = paramsMatch[0].match(/Срок[^
-]*?(\d{1,2}\s+\w+\s+\d{4}[^
-]*)/i);
-    const customer = paramsMatch[0].match(/Заказчик[^|]*\|([^|]+)\|/i) || paramsMatch[0].match(/Заказчик[:\s]+([^
-]+)/i);
-    const method = paramsMatch[0].match(/Способ[^
-]*?(аукцион|запрос|конкурс[^
-]*)/i);
+    const nmck = paramsMatch[0].match(/НМЦК[^|]*\|([^|]+)\|/i) || paramsMatch[0].match(/НМЦК[\s:]+([^\n\r]+)/i);
+    const deadline = paramsMatch[0].match(/Срок[^|]*\|([^|]+)\|/i) || paramsMatch[0].match(/Срок[^:]*:[\s]+([^\n\r]+)/i);
+    const customer = paramsMatch[0].match(/Заказчик[^|]*\|([^|]+)\|/i) || paramsMatch[0].match(/Заказчик[\s:]+([^\n\r]+)/i);
+    const method = paramsMatch[0].match(/Способ[^|]*\|([^|]+)\|/i);
     if (nmck) keyFacts.push({ label: 'НМЦК', value: nmck[1].trim().replace(/\s+/g,' ') });
     if (deadline) keyFacts.push({ label: 'Срок', value: deadline[1].trim() });
     if (customer) keyFacts.push({ label: 'Заказчик', value: (customer[1]||'').trim().slice(0,40) });
