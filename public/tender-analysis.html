@@ -847,8 +847,37 @@ ${context ? `\nКонтекст компании-участника:\n${context}
       throw new Error(err.error?.message || `Ошибка ${response.status}`);
     }
 
-    const data = await response.json();
-    renderReport(data.content.find(b => b.type === 'text')?.text || '');
+    // Читаем SSE поток
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(data);
+          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+            fullText += evt.delta.text;
+          }
+          if (evt.type === 'message_stop') {
+            renderReport(fullText);
+          }
+        } catch {}
+      }
+    }
+
+    if (fullText && !document.getElementById('report').style.display !== 'none') {
+      renderReport(fullText);
+    }
 
   } catch (err) {
     stopLoadingAnimation();
